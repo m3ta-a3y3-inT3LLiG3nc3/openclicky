@@ -30,10 +30,10 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-	<key>NSCameraUsageDescription</key>
-	<string>OpenClicky uses the selected camera only when you enable visual intelligence or meeting notes, so it can understand camera images and visible text.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>OpenClicky uses Apple Events only when you ask it to automate local apps or System Events for guarded macOS control.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>OpenClicky uses the selected camera only when you enable visual intelligence or meeting notes, so it can understand camera images and visible text.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>OpenClicky uses the microphone for push-to-talk voice input, optional “Hey Clicky” wake-word listening, and optional meeting notes transcription.</string>
 	<key>NSScreenCaptureUsageDescription</key>
@@ -43,15 +43,11 @@
 	<key>NSUserNotificationAlertStyle</key>
 	<string>alert</string>
 	<key>SUAllowsAutomaticUpdates</key>
-	<true/>
+	<false/>
 	<key>SUAutomaticallyUpdate</key>
-	<true/>
+	<false/>
 	<key>SUEnableAutomaticChecks</key>
-	<true/>
-	<key>SUFeedURL</key>
-	<string>https://raw.githubusercontent.com/jasonkneen/openclicky/main/appcast.xml</string>
-	<key>SUPublicEDKey</key>
-	<string>fXYcC2zX+zTEH0DVS8io8agfHtphoB9/o6J33T9FLdk=</string>
+	<false/>
 	<key>SUScheduledCheckInterval</key>
 	<integer>86400</integer>
 	<key>VoiceTranscriptionProvider</key>
