@@ -36,6 +36,11 @@ provider-neutral grounding tags.
    at build time (ad-hoc / local development signing) until the fork is re-signed under M3ta's own
    team in Xcode. TCC identity note: macOS ties permission grants to the signing identity, so the
    production TCC grants must be made against the final signed build, in Xcode, by M3ta.
+4. **Bridge token resolution reordered** (`AppBundleConfiguration.externalControlBridgeToken()`):
+   the operator-managed local secrets file (`~/.config/openclicky/secrets.env`, mode 600) is now
+   authoritative; the Keychain/settings value is fallback. Upstream's Keychain-first order let a
+   stale Keychain item silently shadow operator-set tokens and made rotation impossible from the
+   terminal — found live during the first fork deployment (2026-11-06).
 
 ## Provider routing — local-first (M3ta's model rule)
 

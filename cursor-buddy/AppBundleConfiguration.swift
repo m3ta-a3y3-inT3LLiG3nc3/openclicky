@@ -225,10 +225,19 @@ nonisolated enum AppBundleConfiguration {
     }
 
     static func externalControlBridgeToken() -> String? {
-        userDefaultsValue(forKey: userExternalControlBridgeTokenDefaultsKey) ?? stringValue(
+        // SOVEREIGN FORK CHANGE (M3ta-OS, 2026-11-06): the operator-managed local
+        // secrets file (~/.config/openclicky/secrets.env) is authoritative for the
+        // bridge token. Upstream resolved the Keychain first, which let a stale
+        // Keychain item silently shadow every operator-set value and made the
+        // bridge token impossible to rotate from the terminal. The file is
+        // mode-600 operator property; Keychain/settings values remain as fallback.
+        if let fileToken = localDevelopmentEnvironmentValue(forKey: "OPENCLICKY_BRIDGE_TOKEN") {
+            return fileToken
+        }
+        return userDefaultsValue(forKey: userExternalControlBridgeTokenDefaultsKey) ?? stringValue(
             forKey: "OpenClickyExternalControlBridgeToken",
             environmentKeys: ["OPENCLICKY_BRIDGE_TOKEN"]
-        ) ?? localDevelopmentEnvironmentValue(forKey: "OPENCLICKY_BRIDGE_TOKEN")
+        )
     }
 
     static func agentPlaintextProviderSyncEnabled() -> Bool {
