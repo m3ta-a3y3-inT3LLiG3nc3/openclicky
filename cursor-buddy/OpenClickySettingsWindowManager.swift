@@ -214,6 +214,8 @@ struct OpenClickySettingsView: View {
     @AppStorage(AppBundleConfiguration.userMCPComposioConnectEnabledDefaultsKey) private var mcpComposioConnectEnabled = false
     @AppStorage(AppBundleConfiguration.userMCPComputerUseEnabledDefaultsKey) private var mcpComputerUseEnabled = false
     @AppStorage(AppBundleConfiguration.userMCPCuaDriverCommandDefaultsKey) private var mcpCuaDriverCommand = CuaDriverMCPConfiguration.resolvedCommandPath() ?? ""
+    @AppStorage(AppBundleConfiguration.userMCPREAMCPEnabledDefaultsKey) private var mcpREAMCPEnabled = false
+    @AppStorage(AppBundleConfiguration.userMCPREACommandDefaultsKey) private var mcpREACommand = REAMCPConfiguration.resolvedCommandPath() ?? ""
     @AppStorage(AppBundleConfiguration.userDesktopNotificationsEnabledDefaultsKey) private var desktopNotificationsEnabled = true
     @AppStorage(AppBundleConfiguration.userAgentCompletionVoiceEnabledDefaultsKey) private var agentCompletionVoiceEnabled = true
     @AppStorage(AppBundleConfiguration.userWidgetsEnabledDefaultsKey) private var widgetsEnabled = true
@@ -1949,6 +1951,34 @@ struct OpenClickySettingsView: View {
                     openPath: { mcpCuaDriverEffectiveCommand }
                 )
 
+                toggleRow(
+                    title: "REA reverse-engineering MCP",
+                    subtitle: "Optional. Exposes rea-agents MCP for app/binary inspection in Agent Mode.",
+                    systemImageName: "wrench.and.screwdriver",
+                    isOn: Binding(
+                        get: { mcpREAMCPEnabled },
+                        set: { newValue in
+                            mcpREAMCPEnabled = newValue
+                            syncCodexMCPSettings()
+                        }
+                    )
+                )
+
+                textFieldRow(
+                    title: "REA command",
+                    subtitle: mcpREAStatusText,
+                    systemImageName: "terminal",
+                    placeholder: REAMCPConfiguration.resolvedCommandPath() ?? "/opt/homebrew/bin/rea",
+                    text: Binding(
+                        get: { mcpREACommand },
+                        set: { newValue in
+                            mcpREACommand = newValue
+                            syncCodexMCPSettings()
+                        }
+                    ),
+                    openPath: { mcpREAEffectiveCommand }
+                )
+
                 valueRow(
                     title: "Codex config",
                     subtitle: companionManager.codexHomeManager.codexHomeDirectory.appendingPathComponent("config.toml", isDirectory: false).path,
@@ -2118,6 +2148,30 @@ struct OpenClickySettingsView: View {
 
         if FileManager.default.fileExists(atPath: normalizedSettingsPath(command)) {
             return "Ready: \(command)"
+        }
+
+        return "Command will be written to config.toml, but the path was not found yet."
+    }
+
+    private var mcpREAEffectiveCommand: String {
+        let trimmed = mcpREACommand.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { return trimmed }
+        return REAMCPConfiguration.resolvedCommandPath() ?? ""
+    }
+
+    private var mcpREAStatusText: String {
+        guard mcpREAMCPEnabled else {
+            return "Disabled. Turn this on to expose rea-agents reverse-engineering tools to Agent Mode."
+        }
+
+        let command = mcpREAEffectiveCommand
+        guard !command.isEmpty else {
+            return "No rea or npx command found. Install rea-agents (`npm i -g rea-agents`) or paste the command path."
+        }
+
+        let args = REAMCPConfiguration.arguments(forCommand: command).joined(separator: " ")
+        if FileManager.default.fileExists(atPath: normalizedSettingsPath(command)) {
+            return "Ready: \(command) \(args)"
         }
 
         return "Command will be written to config.toml, but the path was not found yet."

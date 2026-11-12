@@ -49,6 +49,8 @@ nonisolated enum AppBundleConfiguration {
     static let userMCPComposioConnectEnabledDefaultsKey = "openClickyMCPComposioConnectEnabled"
     static let userMCPComputerUseEnabledDefaultsKey = "openClickyMCPComputerUseEnabled"
     static let userMCPCuaDriverCommandDefaultsKey = "openClickyMCPCuaDriverCommand"
+    static let userMCPREAMCPEnabledDefaultsKey = "openClickyMCPREAMCPEnabled"
+    static let userMCPREACommandDefaultsKey = "openClickyMCPREACommand"
     static let userExternalInferenceProxyEnabledDefaultsKey = "openClickyExternalInferenceProxyEnabled"
     static let userVisualDrawingOverlayToolsEnabledDefaultsKey = "openClickyVisualDrawingOverlayToolsEnabled"
     static let userGmailOAuthToolsEnabledDefaultsKey = "openClickyGmailOAuthToolsEnabled"
@@ -202,6 +204,20 @@ nonisolated enum AppBundleConfiguration {
             )
             ?? localDevelopmentEnvironmentValue(forKey: CuaDriverMCPConfiguration.environmentOverrideKey)
             ?? CuaDriverMCPConfiguration.resolvedCommandPath()
+    }
+
+    static func mcpREAMCPEnabled() -> Bool {
+        userDefaultsBool(forKey: userMCPREAMCPEnabledDefaultsKey, defaultValue: false)
+    }
+
+    static func mcpREACommand() -> String? {
+        userDefaultsValue(forKey: userMCPREACommandDefaultsKey)
+            ?? stringValue(
+                forKey: "OpenClickyREAMCPCommand",
+                environmentKeys: [REAMCPConfiguration.environmentOverrideKey]
+            )
+            ?? localDevelopmentEnvironmentValue(forKey: REAMCPConfiguration.environmentOverrideKey)
+            ?? REAMCPConfiguration.resolvedCommandPath()
     }
 
     static func externalInferenceProxyEnabled() -> Bool {

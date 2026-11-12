@@ -116,12 +116,20 @@ final class OpenClickyExternalControlBridgeServer: @unchecked Sendable {
             listener.newConnectionHandler = { [weak self] connection in
                 self?.handleNewConnection(connection)
             }
+            let bridgePort = self.port
             listener.stateUpdateHandler = { state in
                 switch state {
                 case .ready:
-                    print("OpenClicky external control bridge listening on http://127.0.0.1:\(self.port)")
+                    print("OpenClicky external control bridge listening on http://127.0.0.1:\(bridgePort)")
+                    OpenClickyRuntimeDiscovery.publishBridge(
+                        port: bridgePort,
+                        bridgeTokenConfigured: AppBundleConfiguration.externalControlBridgeToken() != nil
+                    )
                 case .failed(let error):
                     print("OpenClicky external control bridge failed: \(error)")
+                    OpenClickyRuntimeDiscovery.clearBridge()
+                case .cancelled:
+                    OpenClickyRuntimeDiscovery.clearBridge()
                 default:
                     break
                 }
@@ -136,6 +144,7 @@ final class OpenClickyExternalControlBridgeServer: @unchecked Sendable {
     func stop() {
         listener?.cancel()
         listener = nil
+        OpenClickyRuntimeDiscovery.clearBridge()
         for (_, connection) in sseConnections {
             connection.cancel()
         }
@@ -1116,6 +1125,55 @@ final class OpenClickyExternalControlBridgeServer: @unchecked Sendable {
         case 504: return "Gateway Timeout"
         default: return "OK"
         }
+    }
+}
+
+nonisolated enum OpenClickyRuntimeDiscovery {
+    static func bridgeDiscoveryFileURL(fileManager: FileManager = .default) -> URL {
+        fileManager.homeDirectoryForCurrentUser
+            .appendingPathComponent(".config", isDirectory: true)
+            .appendingPathComponent("openclicky", isDirectory: true)
+            .appendingPathComponent("runtime", isDirectory: true)
+            .appendingPathComponent("bridge.json", isDirectory: false)
+    }
+
+    static func publishBridge(
+        port: UInt16,
+        bridgeTokenConfigured: Bool,
+        fileURL: URL? = nil,
+        fileManager: FileManager = .default,
+        bundle: Bundle = .main
+    ) {
+        let targetURL = fileURL ?? bridgeDiscoveryFileURL(fileManager: fileManager)
+        let directoryURL = targetURL.deletingLastPathComponent()
+        do {
+            try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+            let formatter = ISO8601DateFormatter()
+            formatter.timeZone = TimeZone(secondsFromGMT: 0)
+            let appVersion = (bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "unknown"
+            let payload: [String: Any] = [
+                "name": "OpenClicky External Control Bridge",
+                "pid": Int(ProcessInfo.processInfo.processIdentifier),
+                "port": Int(port),
+                "baseURL": "http://127.0.0.1:\(port)",
+                "healthURL": "http://127.0.0.1:\(port)/health",
+                "mcpURL": "http://127.0.0.1:\(port)/mcp",
+                "bridgeTokenRequired": true,
+                "bridgeTokenConfigured": bridgeTokenConfigured,
+                "appVersion": appVersion,
+                "updatedAt": formatter.string(from: Date())
+            ]
+            let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
+            try data.write(to: targetURL, options: .atomic)
+            try? fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: targetURL.path)
+        } catch {
+            print("OpenClicky runtime discovery write failed: \(error)")
+        }
+    }
+
+    static func clearBridge(fileURL: URL? = nil, fileManager: FileManager = .default) {
+        let targetURL = fileURL ?? bridgeDiscoveryFileURL(fileManager: fileManager)
+        try? fileManager.removeItem(at: targetURL)
     }
 }
 

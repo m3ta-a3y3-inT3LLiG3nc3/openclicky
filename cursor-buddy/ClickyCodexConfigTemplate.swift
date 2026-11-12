@@ -14,6 +14,7 @@ struct ClickyCodexConfigTemplate: Equatable {
     var includeComposioConnectMCP: Bool
     var includeOpenClickyControlMCP: Bool
     var cuaDriverMCPCommand: String?
+    var reaMCPCommand: String?
     var preferAPIKeyAuthForDefaultOpenAI: Bool
 
     init(
@@ -27,6 +28,7 @@ struct ClickyCodexConfigTemplate: Equatable {
         includeComposioConnectMCP: Bool = false,
         includeOpenClickyControlMCP: Bool = false,
         cuaDriverMCPCommand: String? = nil,
+        reaMCPCommand: String? = nil,
         preferAPIKeyAuthForDefaultOpenAI: Bool = false
     ) {
         self.model = model
@@ -39,6 +41,7 @@ struct ClickyCodexConfigTemplate: Equatable {
         self.includeComposioConnectMCP = includeComposioConnectMCP
         self.includeOpenClickyControlMCP = includeOpenClickyControlMCP
         self.cuaDriverMCPCommand = cuaDriverMCPCommand
+        self.reaMCPCommand = reaMCPCommand
         self.preferAPIKeyAuthForDefaultOpenAI = preferAPIKeyAuthForDefaultOpenAI
     }
 
@@ -115,6 +118,18 @@ struct ClickyCodexConfigTemplate: Equatable {
                 "CUA_DRIVER_EMBEDDED = \"1\"",
                 "CUA_DRIVER_TELEMETRY_ENABLED = \"false\"",
                 "CUA_TELEMETRY_ENABLED = \"false\""
+            ])
+        }
+
+        if let reaMCPCommand = normalizedOptionalString(reaMCPCommand) {
+            let renderedArgs = REAMCPConfiguration.arguments(forCommand: reaMCPCommand)
+                .map { "\"\(escape($0))\"" }
+                .joined(separator: ", ")
+            lines.append(contentsOf: [
+                "",
+                "[mcp_servers.rea]",
+                "command = \"\(escape(reaMCPCommand))\"",
+                "args = [\(renderedArgs)]"
             ])
         }
 
@@ -215,6 +230,49 @@ nonisolated enum CuaDriverMCPConfiguration {
             }
         }
         return nil
+    }
+
+    private static func normalized(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+nonisolated enum REAMCPConfiguration {
+    static let environmentOverrideKey = "OPENCLICKY_REA_MCP_COMMAND"
+    static let knownCommandPaths = [
+        "/opt/homebrew/bin/rea",
+        "/usr/local/bin/rea"
+    ]
+    static let npxFallbackPaths = [
+        "/opt/homebrew/bin/npx",
+        "/usr/local/bin/npx"
+    ]
+
+    static func resolvedCommandPath(
+        fileManager: FileManager = .default,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> String? {
+        if let override = normalized(environment[environmentOverrideKey]) {
+            return override
+        }
+
+        if let installed = knownCommandPaths.first(where: { fileManager.isExecutableFile(atPath: $0) || fileManager.fileExists(atPath: $0) }) {
+            return installed
+        }
+
+        return npxFallbackPaths.first { fileManager.isExecutableFile(atPath: $0) || fileManager.fileExists(atPath: $0) }
+    }
+
+    static func arguments(forCommand command: String) -> [String] {
+        let executableName = URL(fileURLWithPath: command.trimmingCharacters(in: .whitespacesAndNewlines))
+            .lastPathComponent
+            .lowercased()
+        if executableName == "npx" {
+            return ["-y", "rea-agents", "mcp"]
+        }
+        return ["mcp"]
     }
 
     private static func normalized(_ value: String?) -> String? {

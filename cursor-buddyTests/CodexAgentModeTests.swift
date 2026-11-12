@@ -193,6 +193,86 @@ struct CodexAgentModeTests {
         #expect(rendered.contains("http://127.0.0.1:32123/mcp"))
     }
 
+    @Test func codexConfigOmitsREAMCPServerWhenNil() throws {
+        let template = ClickyCodexConfigTemplate(
+            model: "gpt-5.6-sol",
+            reasoningEffort: "medium",
+            workerBaseURL: URL(string: "https://api.openai.com/v1")!,
+            includeOpenAIDeveloperDocsMCP: false,
+            reaMCPCommand: nil
+        )
+
+        let rendered = template.render()
+
+        #expect(!rendered.contains("[mcp_servers.rea]"))
+    }
+
+    @Test func codexConfigRendersREAMCPServerForInstalledBinary() throws {
+        let template = ClickyCodexConfigTemplate(
+            model: "gpt-5.6-sol",
+            reasoningEffort: "medium",
+            workerBaseURL: URL(string: "https://api.openai.com/v1")!,
+            includeOpenAIDeveloperDocsMCP: false,
+            reaMCPCommand: "/opt/homebrew/bin/rea"
+        )
+
+        let rendered = template.render()
+
+        #expect(rendered.contains("[mcp_servers.rea]"))
+        #expect(rendered.contains("command = \"/opt/homebrew/bin/rea\""))
+        #expect(rendered.contains("args = [\"mcp\"]"))
+    }
+
+    @Test func codexConfigRendersREAMCPServerForNpxFallback() throws {
+        let template = ClickyCodexConfigTemplate(
+            model: "gpt-5.6-sol",
+            reasoningEffort: "medium",
+            workerBaseURL: URL(string: "https://api.openai.com/v1")!,
+            includeOpenAIDeveloperDocsMCP: false,
+            reaMCPCommand: "/opt/homebrew/bin/npx"
+        )
+
+        let rendered = template.render()
+
+        #expect(rendered.contains("[mcp_servers.rea]"))
+        #expect(rendered.contains("command = \"/opt/homebrew/bin/npx\""))
+        #expect(rendered.contains("args = [\"-y\", \"rea-agents\", \"mcp\"]"))
+    }
+
+    @Test func reaMCPConfigurationPrefersExplicitOpenClickyOverride() throws {
+        let command = REAMCPConfiguration.resolvedCommandPath(
+            environment: [REAMCPConfiguration.environmentOverrideKey: "/tmp/custom-rea"]
+        )
+
+        #expect(command == "/tmp/custom-rea")
+    }
+
+    @Test func runtimeDiscoveryPublishesAndClearsBridgeMetadataWithoutToken() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("openclicky-discovery-test-\(UUID().uuidString)", isDirectory: true)
+        let tempURL = directory.appendingPathComponent("bridge.json", isDirectory: false)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        OpenClickyRuntimeDiscovery.publishBridge(
+            port: 32123,
+            bridgeTokenConfigured: true,
+            fileURL: tempURL
+        )
+
+        let data = try Data(contentsOf: tempURL)
+        let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(json["port"] as? Int == 32123)
+        #expect(json["baseURL"] as? String == "http://127.0.0.1:32123")
+        #expect(json["healthURL"] as? String == "http://127.0.0.1:32123/health")
+        #expect(json["mcpURL"] as? String == "http://127.0.0.1:32123/mcp")
+        #expect(json["bridgeTokenRequired"] as? Bool == true)
+        #expect(json["bridgeTokenConfigured"] as? Bool == true)
+        #expect(json["token"] == nil)
+
+        OpenClickyRuntimeDiscovery.clearBridge(fileURL: tempURL)
+        #expect(!FileManager.default.fileExists(atPath: tempURL.path))
+    }
+
     @Test func cuaDriverMCPConfigurationPrefersExplicitOpenClickyOverride() throws {
         let command = CuaDriverMCPConfiguration.resolvedCommandPath(
             environment: [CuaDriverMCPConfiguration.environmentOverrideKey: "/tmp/custom-cua-driver"]

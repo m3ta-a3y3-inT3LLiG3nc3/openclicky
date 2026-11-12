@@ -173,6 +173,9 @@ final class CodexHomeManager {
         let cuaDriverCommand = AppBundleConfiguration.mcpComputerUseEnabled()
             ? AppBundleConfiguration.mcpCuaDriverCommand()
             : nil
+        let reaCommand = AppBundleConfiguration.mcpREAMCPEnabled()
+            ? AppBundleConfiguration.mcpREACommand()
+            : nil
         let config = ClickyCodexConfigTemplate(
             model: model,
             reasoningEffort: reasoningEffort,
@@ -183,6 +186,7 @@ final class CodexHomeManager {
             includeOpenAIDeveloperDocsMCP: AppBundleConfiguration.mcpDeveloperDocsEnabled(),
             includeComposioConnectMCP: AppBundleConfiguration.mcpComposioConnectEnabled(),
             cuaDriverMCPCommand: cuaDriverCommand,
+            reaMCPCommand: reaCommand,
             preferAPIKeyAuthForDefaultOpenAI: Self.hasConfiguredOpenAIAPIKey()
         )
         let configFile = codexHomeDirectory.appendingPathComponent("config.toml", isDirectory: false)
