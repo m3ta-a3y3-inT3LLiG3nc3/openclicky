@@ -2455,7 +2455,37 @@ final class CompanionManager: ObservableObject {
         server.start()
     }
 
+    /// Returns a non-success response when the cursor overlay cannot be shown
+    /// (today: macOS Accessibility not trusted for this exact running binary).
+    /// Overlay-drawing bridge commands used to answer `ok: true` even when
+    /// nothing was drawn, which made a TCC/signing mismatch look like a
+    /// working bridge.
+    private func overlayUnavailableResponseIfNeeded() -> OpenClickyExternalControlResponse? {
+        if showCursorOverlayIfAvailable() { return nil }
+        let accessibilityGranted = hasAccessibilityPermission
+        let message = accessibilityGranted
+            ? "OpenClicky could not show its cursor overlay."
+            : "OpenClicky cannot draw its overlay because macOS Accessibility is not granted to this running build."
+        print("OpenClicky external control: overlay unavailable (accessibility: \(accessibilityGranted))")
+        return OpenClickyExternalControlResponse(statusCode: 503, body: [
+            "ok": false,
+            "error": message,
+            "code": "overlay_unavailable",
+            "accessibilityGranted": accessibilityGranted,
+            "hint": "Remove OpenClicky from System Settings > Privacy & Security > Accessibility, relaunch the Xcode-signed build, and grant it again. Permission grants are tied to the signing identity of the running binary."
+        ])
+    }
+
     private func handleExternalControlCommand(_ command: OpenClickyExternalControlCommand) async -> OpenClickyExternalControlResponse {
+        switch command {
+        case .showCursor, .showCursors, .showVisualGuidanceOverlay, .showCaption:
+            if let unavailable = overlayUnavailableResponseIfNeeded() {
+                return unavailable
+            }
+        default:
+            break
+        }
+
         switch command {
         case .showCursor(let point, let caption, let duration, let accentHex, let mode, let travelDuration):
             switch mode {
@@ -2478,6 +2508,7 @@ final class CompanionManager: ObservableObject {
             let resolvedPoint = point ?? NSEvent.mouseLocation
             showExternalPrimaryCursor(at: resolvedPoint, caption: text, duration: duration, accentHex: accentHex, travelDuration: 0.35)
             return .ok(["displayed": "primary_caption", "durationMs": Int(duration * 1000)])
+
         case .captureScreenshot(let focused):
             return await captureExternalControlScreenshots(focused: focused)
         case .click(let point, let caption):
@@ -13709,12 +13740,17 @@ final class CompanionManager: ObservableObject {
         showCursorOverlayIfAvailable()
     }
 
-    func showCursorOverlayIfAvailable() {
-        guard hasAccessibilityPermission else { return }
-        guard !isOverlayVisible || !overlayWindowManager.isShowingOverlay() else { return }
+    /// Shows the cursor overlay when permissions allow it. Returns whether the
+    /// overlay is actually up so external-control callers can report the truth
+    /// instead of claiming success for a command that drew nothing.
+    @discardableResult
+    func showCursorOverlayIfAvailable() -> Bool {
+        guard hasAccessibilityPermission else { return false }
+        guard !isOverlayVisible || !overlayWindowManager.isShowingOverlay() else { return true }
         overlayWindowManager.hasShownOverlayBefore = true
         overlayWindowManager.showOverlay(onScreens: NSScreen.screens, companionManager: self)
         isOverlayVisible = true
+        return overlayWindowManager.isShowingOverlay()
     }
 
     private func directComputerUseAgentBoundaryCueText() -> String {
